@@ -27,16 +27,16 @@ if not json_file :
     st.info("Upload GA JSON Authenticator to continue")
     st.stop()
 
-# if json_file :
-#     with tempfile.NamedTemporaryFile(delete=False) as fp:
-#         fp.write(json_file.getvalue())
-#     try:
-#         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = fp.name          
-#         with open(fp.name,'rb') as a:
-#              client = bigquery.Client()
-#     finally:
-#           if os.path.isfile(fp.name):
-#               os.unlink(fp.name)
+if json_file :
+    with tempfile.NamedTemporaryFile(delete=False) as fp:
+        fp.write(json_file.getvalue())
+    try:
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = fp.name          
+        with open(fp.name,'rb') as a:
+             client = bigquery.Client()
+    finally:
+          if os.path.isfile(fp.name):
+              os.unlink(fp.name)
 
 
 # Get IDs for Project before continuing
