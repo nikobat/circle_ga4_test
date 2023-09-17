@@ -32,7 +32,7 @@ else:
     finally:
           if os.path.isfile(fp.name):
               os.unlink(fp.name)
-if not os.environ['GOOGLE_APPLICATION_CREDENTIALS'] :
+if not json_file :
     st.info("Upload JSON Authenticaor to continue")
     st.stop()
 
