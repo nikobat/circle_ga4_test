@@ -1,7 +1,6 @@
 streamlit
 pandas
 google-cloud-bigquery
-os
 json
 tempfile
 io
