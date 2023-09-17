@@ -332,7 +332,7 @@ def create_event_table_view(client, project_id, dataset_id, table_patterns, keys
 
 
 
-
+#This is where things are run
 keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, table_patterns)
 if keys_and_types:
     st.write("Retrieved keys and types:", keys_and_types)
