@@ -18,6 +18,7 @@ st.title("Getting stuff out of GA4")
 st.subheader("This will make it easy and useful")
 
 if  os.path.isfile('teamcircle-399006-af8e226fd4ff.json') == True:
+    json_file = os.path.isfile('teamcircle-399006-af8e226fd4ff.json')
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'teamcircle-399006-af8e226fd4ff.json'
     client = bigquery.Client()
 else:
@@ -31,7 +32,7 @@ else:
     finally:
           if os.path.isfile(fp.name):
               os.unlink(fp.name)
-if not os.environ['GOOGLE_APPLICATION_CREDENTIALS'] :
+if not json_file :
     st.info("Upload JSON Authenticaor to continue")
     st.stop()
 
