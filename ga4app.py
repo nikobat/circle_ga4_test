@@ -23,18 +23,20 @@ if  os.path.isfile('teamcircle-399006-af8e226fd4ff.json') == True:
     client = bigquery.Client()
 else:
     json_file = st.file_uploader("Drop your JSON here", type="json")
-    with tempfile.NamedTemporaryFile(delete=False) as fp:
-        fp.write(json_file.getvalue())
-    try:
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = fp.name          
-        with open(fp.name,'rb') as a:
-             client = bigquery.Client()
-    finally:
-          if os.path.isfile(fp.name):
-              os.unlink(fp.name)
 if not json_file :
-    st.info("Upload JSON Authenticaor to continue")
+    st.info("Upload GA JSON Authenticator to continue")
     st.stop()
+
+# if json_file :
+#     with tempfile.NamedTemporaryFile(delete=False) as fp:
+#         fp.write(json_file.getvalue())
+#     try:
+#         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = fp.name          
+#         with open(fp.name,'rb') as a:
+#              client = bigquery.Client()
+#     finally:
+#           if os.path.isfile(fp.name):
+#               os.unlink(fp.name)
 
 
 # Get IDs for Project before continuing
