@@ -6,6 +6,7 @@ import tempfile
 import logging
 
 from google.cloud import bigquery
+from google.api_core.exceptions import NotFound, BadRequest, GoogleAPICallError
 from io import StringIO
 
 # Configure logging
@@ -306,15 +307,24 @@ def create_summary_statistics(client, project_id, dataset_id, view_names):
 def create_or_replace_view(client, project_id, dataset_id, view_name, query):
     logging.info(f"Creating/Modifying view: {view_name}...")
     view_id = f"{project_id}.{dataset_id}.{view_name}"
-    
+
     view = bigquery.Table(view_id)
     view.view_query = query
-    
+
     try:
-        view = client.update_table(view, ["view_query"])
-        logging.info(f"Created/Modified view {view_id} successfully.")
-    except NotFound as e:
-        logging.error("Error: View not found. Details: %s", e)
+        # Check if the view already exists
+        client.get_table(view_id)
+        view_exists = True
+    except NotFound:
+        view_exists = False
+
+    try:
+        if view_exists:
+            view = client.update_table(view, ["view_query"])
+            logging.info(f"Modified view {view_id} successfully.")
+        else:
+            view = client.create_table(view)
+            logging.info(f"Created view {view_id} successfully.")
     except BadRequest as e:
         logging.error("Error: Bad request (e.g., schema or query issue). Details: %s", e)
     except GoogleAPICallError as e:
@@ -335,7 +345,7 @@ def create_event_table_view(client, project_id, dataset_id, table_patterns, keys
 #This is where things are run
 keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, table_patterns)
 if keys_and_types:
-    st.write("Retrieved keys and types:", keys_and_types)
+    st.write("Retrieved keys and types:")#, keys_and_types)
     generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns)
     st.write("generate_event_table_query")
     create_user_table_view(client, project_id, dataset_id, user_table_pattern)
@@ -344,5 +354,6 @@ if keys_and_types:
     st.write("create_event_table_view")
     create_summary_statistics(client, project_id, dataset_id, view_names)
     st.write("create_summary_statistics")
+    st.write("DONEZ0!")
 else:
     st.write("Failed to retrieve keys and types.")
