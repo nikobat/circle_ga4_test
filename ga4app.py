@@ -12,55 +12,6 @@ from io import StringIO
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='script.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
-
-st.set_page_config(layout="wide", page_icon="🛠️", page_title="GA4 RULZ")
-st.title("Getting stuff out of GA4")
-st.subheader("This will make it easy and useful")
-
-if  os.path.isfile('teamcircle-399006-af8e226fd4ff.json') == True:
-    json_file = os.path.isfile('teamcircle-399006-af8e226fd4ff.json')
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'teamcircle-399006-af8e226fd4ff.json'
-    client = bigquery.Client()
-else:
-    json_file = st.file_uploader("Drop your JSON here", type="json")
-if not json_file :
-    st.info("Upload GA JSON Authenticator to continue")
-    st.stop()
-
-if json_file :
-    with tempfile.NamedTemporaryFile(delete=False) as fp:
-        fp.write(json_file.getvalue())
-    try:
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = fp.name          
-        with open(fp.name,'rb') as a:
-             client = bigquery.Client()
-    finally:
-          if os.path.isfile(fp.name):
-              os.unlink(fp.name)
-
-
-# Get IDs for Project before continuing
-if "PROJECT_ID" in st.secrets:
-    project_id = st.secrets["PROJECT_ID"]
-else:
-    project_id = st.sidebar.text_input("Project ID")
-if not project_id:
-    st.info("Enter a Project ID to continue")
-    st.stop()
-
-if "DATASET_ID" in st.secrets:
-    dataset_id = st.secrets["DATASET_ID"]
-else:
-    dataset_id = st.sidebar.text_input("Dataset ID")
-if not dataset_id:
-    st.info("Enter a Dataset ID to continue")
-    st.stop()
-
-view_names = "user_table_view", "event_table_view"
-table_patterns = "events_*", "events_intraday_*"
-user_table_pattern = "pseudonymous_users_*"
-
-
 def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
     print("Getting unique keys and their types...")
     union_subqueries = [
@@ -344,20 +295,81 @@ def create_event_table_view(client, project_id, dataset_id, table_patterns, keys
     event_table_query = generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns)
     create_or_replace_view(client, project_id, dataset_id, "event_table_view", event_table_query)
 
+view_names = "user_table_view", "event_table_view"
+table_patterns = "events_*", "events_intraday_*"
+user_table_pattern = "pseudonymous_users_*"
 
 
-#This is where things are run
-keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, table_patterns)
-if keys_and_types:
-    st.write("Retrieved keys and types:")#, keys_and_types)
-    generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns)
-    st.write("generate_event_table_query")
-    create_user_table_view(client, project_id, dataset_id, user_table_pattern)
-    st.write("create_user_table_view")
-    create_event_table_view(client, project_id, dataset_id, table_patterns, keys_and_types)
-    st.write("create_event_table_view")
-    create_summary_statistics(client, project_id, dataset_id, view_names)
-    st.write("create_summary_statistics")
-    st.write("DONEZ0!")
-else:
-    st.write("Failed to retrieve keys and types.")
+st.set_page_config(layout="wide", page_icon="🛠️", page_title="GA4 RULZ")
+st.title("Getting stuff out of GA4")
+st.subheader("This will make it easy and useful")
+
+# Get IDs for Project before continuing
+
+
+tab1, tab2 = st.tabs(["Main", "Instructions"])
+
+#Explain what is the point of this tool
+with tab1:
+    st.write("### What am I?")
+    st.write("I am GA4 *cat* :cat: **MEOW**")
+
+# Step by step instructions and running
+with tab2:
+    if  os.path.isfile('teamcircle-399006-af8e226fd4ff.json') == True:
+        json_file = os.path.isfile('teamcircle-399006-af8e226fd4ff.json')
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'teamcircle-399006-af8e226fd4ff.json'
+        client = bigquery.Client()
+    else:
+        st.write("Generate your JSON by balah blah")
+        json_file = st.file_uploader("Drop your JSON here", type="json")
+    if not json_file :
+        st.info("Upload GA JSON Authenticator to continue")
+        st.stop()
+
+    if json_file :
+        with tempfile.NamedTemporaryFile(delete=False) as fp:
+            fp.write(json_file.getvalue())
+        try:
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = fp.name          
+            with open(fp.name,'rb') as a:
+                client = bigquery.Client()
+        finally:
+            if os.path.isfile(fp.name):
+                os.unlink(fp.name)
+    
+    if "PROJECT_ID" in st.secrets:
+        project_id = st.secrets["PROJECT_ID"]
+    else:
+        st.write("Give us your project id from balah blah")
+        project_id = st.text_input("Project ID")
+    if not project_id:
+        st.info("Enter a Project ID to continue")
+        st.stop()
+
+    if "DATASET_ID" in st.secrets:
+        dataset_id = st.secrets["DATASET_ID"]
+    else:
+        st.write("Give us your dataset id from balah blah")
+        dataset_id = st.text_input("Dataset ID")
+    if not dataset_id:
+        st.info("Enter a Dataset ID to continue")
+        st.stop()
+
+    #This is where things are run
+    keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, table_patterns)
+    if keys_and_types:
+        st.write("Retrieved keys and types:")#, keys_and_types)
+        generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns)
+        st.write("generate_event_table_query")
+        create_user_table_view(client, project_id, dataset_id, user_table_pattern)
+        st.write("create_user_table_view")
+        create_event_table_view(client, project_id, dataset_id, table_patterns, keys_and_types)
+        st.write("create_event_table_view")
+        create_summary_statistics(client, project_id, dataset_id, view_names)
+        st.write("create_summary_statistics")
+        st.write("DONEZ0!")
+    else:
+        st.write("Failed to retrieve keys and types.")
+
+
