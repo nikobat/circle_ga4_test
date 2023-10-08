@@ -305,14 +305,14 @@ st.title("Unlocking your GA4 data :unlock:")
 
 # Get IDs for Project before continuing
 
-tab1, tab2 = st.tabs(["Main", "Instructions"])
+tab1, tab2, tab3 = st.tabs(["Main", "Instructions", "Dashboard"])
 
 #Explain what is the point of this tool
 with tab1:
     st.write('''
              ## Explanation
              ### For those curious about the technical aspects: 
-             This Streamlit app is designed to analyse data from Google Analytics 4 (GA4) stored in BigQuery. The steps above ensure that GA4 data is sent to BigQuery, and that the app can securely access this data. When you upload the JSON config file, you're providing the app with a set of credentials. These credentials act as a key, giving the app permission to read the GA4 data from BigQuery. It's a secure way to allow access without sharing sensitive information. Once the dataset is selected and the app runs, it processes the data using Python scripts, for non-technical users, think of this app as a bridge between your GA4 data in BigQuery and actionable insights. By providing the necessary setup and credentials, you're allowing the app to fetch, process, and visualize the data in a way that's meaningful and valuable to you.
+             This Streamlit app is designed to analyse data from Google Analytics 4 (GA4) stored in BigQuery. The instructions will ensure that GA4 data is sent to BigQuery, and that the app can securely access this data. When you upload the JSON config file, you're providing the app with a set of credentials. These credentials act as a key, giving the app permission to read the GA4 data from BigQuery. It's a secure way to allow access without sharing sensitive information. Once the dataset is selected and the app runs, it processes the data using Python scripts, for non-technical users, think of this app as a bridge between your GA4 data in BigQuery and actionable insights. By providing the necessary setup and credentials, you're allowing the app to fetch, process, and visualize the data in a way that's meaningful and valuable to you.
             ### Combining Daily and Intra-Daily Feeds for Both Event and User Data:
             GA4 exports data to BigQuery in two primary feeds: daily and intra-daily, both for event data and user data. For event data, the daily feed gives a full snapshot of the previous day's events, while the intra-daily feed provides near real-time event data throughout the day. For user data, the daily feed captures a daily snapshot of user-level information, while the intra-daily feed provides incremental updates on user interactions. The code consolidates these feeds, ensuring that the combined data view is up-to-date, comprehensive, and consistent across both events and users.
             1.	Assessing Data Types and Quality for Both Tables:  
@@ -405,8 +405,10 @@ with tab2:
         st.write("create_event_table_view")
         create_summary_statistics(client, project_id, dataset_id, view_names)
         st.write("create_summary_statistics")
-        st.write("DONEZ0!")
+        st.write("FINISHED!")
     else:
         st.write("Failed to retrieve keys and types.")
+
+with tab3:
 
 
