@@ -305,7 +305,7 @@ st.title("Unlocking your GA4 data :unlock:")
 
 # Get IDs for Project before continuing
 
-tab1, tab2, tab3 = st.tabs(["Main", "Instructions", "Dashboard"])
+tab1, tab2 = st.tabs(["Main", "Instructions"])
 
 #Explain what is the point of this tool
 with tab1:
@@ -406,9 +406,12 @@ with tab2:
         create_summary_statistics(client, project_id, dataset_id, view_names)
         st.write("create_summary_statistics")
         st.write("FINISHED!")
+        st.write('''
+            ### Notes
+            [Link to looker dashboard](https://lookerstudio.google.com/reporting/b774ca26-720c-4b23-999c-5e5cec53bca3/preview)
+            1. You will need to manually set up your timezones
+            ''')
     else:
         st.write("Failed to retrieve keys and types.")
-
-with tab3:
 
 
