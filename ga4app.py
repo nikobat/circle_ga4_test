@@ -4,7 +4,9 @@ import os
 import json
 import tempfile
 import logging
+import pytz 
 
+from datetime import datetime
 from google.cloud import bigquery
 from google.api_core.exceptions import NotFound, BadRequest, GoogleAPICallError
 from io import StringIO
@@ -12,6 +14,73 @@ from io import StringIO
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='script.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
+# Create a dictionary with country name and corresponding timezone
+timezone_dict = {
+    "North America": {
+        "United States": "America/New_York",
+        "Canada": "America/Toronto",
+        "Mexico": "America/Mexico_City",
+        "Jamaica": "America/Jamaica",
+        "Costa Rica": "America/Costa_Rica",
+        "Bahamas": "America/Nassau",
+        "Honduras": "America/Tegucigalpa",
+        "Cuba": "America/Havana",
+        "Dominican Republic": "America/Santo_Domingo"
+    },
+    "South America": {
+        "Brazil": "America/Sao_Paulo",
+        "Argentina": "America/Argentina/Buenos_Aires",
+        "Chile": "America/Santiago",
+        "Colombia": "America/Bogota",
+        "Peru": "America/Lima",
+        "Uruguay": "America/Montevideo",
+        "Ecuador": "America/Guayaquil",
+        "Bolivia": "America/La_Paz",
+        "Paraguay": "America/Asuncion",
+        "Venezuela": "America/Caracas"
+    },
+    "Europe": {
+        "United Kingdom": "Europe/London",
+        "France": "Europe/Paris",
+        "Germany": "Europe/Berlin",
+        "Italy": "Europe/Rome",
+        "Spain": "Europe/Madrid",
+        "Russia": "Europe/Moscow",
+        "Turkey": "Europe/Istanbul",
+        "Greece": "Europe/Athens",
+        "Poland": "Europe/Warsaw",
+        "Ukraine": "Europe/Kiev"
+    },
+    "Asia": {
+        "India": "Asia/Kolkata",
+        "Japan": "Asia/Tokyo",
+        "China": "Asia/Shanghai",
+        "Saudi Arabia": "Asia/Riyadh",
+        "South Korea": "Asia/Seoul",
+        "Indonesia": "Asia/Jakarta",
+        "Malaysia": "Asia/Kuala_Lumpur",
+        "Vietnam": "Asia/Ho_Chi_Minh",
+        "Philippines": "Asia/Manila",
+        "Thailand": "Asia/Bangkok"
+    },
+    "Oceania": {
+        "Australia": "Australia/Sydney",
+        "New Zealand": "Pacific/Auckland",
+        "Fiji": "Pacific/Fiji",
+        "Papua New Guinea": "Pacific/Port_Moresby",
+        "Samoa": "Pacific/Apia",
+        "Tonga": "Pacific/Tongatapu",
+        "Solomon Islands": "Pacific/Guadalcanal",
+        "Vanuatu": "Pacific/Efate",
+        "Kiribati": "Pacific/Tarawa",
+        "New Caledonia": "Pacific/Noumea"
+    }
+}
+
+# Create a list of continents
+continents = ["North America", "South America", "Europe", "Asia", "Oceania"]
+
+# 
 def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
     print("Getting unique keys and their types...")
     union_subqueries = [
@@ -33,6 +102,7 @@ def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
     st.write("Unique keys and types retrieved successfully.")
     return {row.key: row.value_type for row in keys_and_types}
 
+# 
 def generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns):
     logging.info("Generating the event table query...")
     
@@ -299,6 +369,10 @@ view_names = "user_table_view", "event_table_view"
 table_patterns = "events_*", "events_intraday_*"
 user_table_pattern = "pseudonymous_users_*"
 
+############################################################################################################################################################
+# Streamlit Layout
+############################################################################################################################################################
+
 
 st.set_page_config(layout="wide", page_icon=":unlock:", page_title="GA4 Data Transformer and Dashboard")
 st.title("Unlocking your GA4 data :unlock:")
@@ -329,6 +403,24 @@ with tab1:
 with tab2:
     st.write('''
             ## Step-by-Step Guide
+            ### Set timezone adjustment:
+            **What this does:** The drop downs below allow for your Google Analytics 4 data to show time in your timezone rather than default of UTC .
+             ''')
+    # Create a dropdown to select a continent
+    continent = st.selectbox("1. Select a continent", continents)
+
+    # Create a dropdown to select a country within the selected continent
+    countries = list(timezone_dict[continent].keys())
+    country = st.selectbox("2. Select a country", countries)
+    
+    # Display the selected UTC offset for confirmation
+    timezone = timezone_dict[continent][country]
+    utc_offset = datetime.now(pytz.timezone(timezone)).strftime('%z')
+    utc_ts = utc_offset[:-2]+':'+utc_offset[-2:]
+    st.markdown(f"> :earth_americas: **{country}** time zone is **UTC{utc_ts}**")
+
+
+    st.write('''
             ### Connect Google Analytics 4 (GA4) to BigQuery:
             **What this does:** This step ensures that your Google Analytics 4 data is being sent to BigQuery, making it accessible for further analysis.
             1. Go to your GA4 Property.
