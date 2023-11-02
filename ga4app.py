@@ -82,7 +82,7 @@ continents = ["North America", "South America", "Europe", "Asia", "Oceania"]
 
 # 
 def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
-    print("Getting unique keys and their types...")
+    st.write("Getting unique keys and their types...")
     union_subqueries = [
         f"""
         SELECT key, 
@@ -103,7 +103,7 @@ def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
     return {row.key: row.value_type for row in keys_and_types}
 
 # 
-def generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns):
+def generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns, utc_ts):
     logging.info("Generating the event table query...")
     
     pivot_sections = []
@@ -121,7 +121,7 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
     union_subqueries = [
         f"""
         SELECT
-            TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
+            DATETIME(TIMESTAMP_MICROS(event_timestamp), "{utc_ts}") AS event_timestamp,
             user_pseudo_id,
             event_name,
             platform AS event_platform,
@@ -213,17 +213,17 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
 
     # ... (rest of the generate_event_table_query function logic here)
     
-    logging.info("Event table query generated successfully.")
+    logging.info("Event table query generated successfully...")
 
-def generate_user_table_query(project_id, dataset_id, user_table_pattern):
+def generate_user_table_query(project_id, dataset_id, user_table_pattern, utc_ts):
     logging.info("Generating the user table query...")
     
     sql_query = f"""
     SELECT
         pseudo_user_id AS user_pseudo_id,
         stream_id AS user_stream_id,
-        user_info.last_active_timestamp_micros AS user_last_active_timestamp,
-        user_info.user_first_touch_timestamp_micros AS user_first_touch_timestamp,
+        DATETIME(TIMESTAMP_MICROS(user_info.last_active_timestamp_micros), "{utc_ts}") AS user_last_active_timestamp,
+        DATETIME(TIMESTAMP_MICROS(user_info.user_first_touch_timestamp_micros), "{utc_ts}") AS user_first_touch_timestamp,
         user_info.first_purchase_date AS user_first_purchase_date,
         device.operating_system AS user_device_operating_system,
         device.category AS user_device_category,
@@ -357,12 +357,12 @@ def create_or_replace_view(client, project_id, dataset_id, view_name, query):
     except Exception as e:
         logging.error("An unexpected error occurred: %s", e)
 
-def create_user_table_view(client, project_id, dataset_id, user_table_pattern):
-    user_table_query = generate_user_table_query(project_id, dataset_id, user_table_pattern)
+def create_user_table_view(client, project_id, dataset_id, user_table_pattern, utc_ts):
+    user_table_query = generate_user_table_query(project_id, dataset_id, user_table_pattern, utc_ts)
     create_or_replace_view(client, project_id, dataset_id, "user_table_view", user_table_query)
 
 def create_event_table_view(client, project_id, dataset_id, table_patterns, keys_and_types):
-    event_table_query = generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns)
+    event_table_query = generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns, utc_ts)
     create_or_replace_view(client, project_id, dataset_id, "event_table_view", event_table_query)
 
 view_names = "user_table_view", "event_table_view"
@@ -417,8 +417,7 @@ with tab2:
     timezone = timezone_dict[continent][country]
     utc_offset = datetime.now(pytz.timezone(timezone)).strftime('%z')
     utc_ts = utc_offset[:-2]+':'+utc_offset[-2:]
-    st.markdown(f"> :earth_americas: **{country}** time zone is **UTC{utc_ts}**")
-
+    st.markdown(f"> :earth_americas:  **{country}** time zone is **UTC{utc_ts}**")
 
     st.write('''
             ### Connect Google Analytics 4 (GA4) to BigQuery:
@@ -489,9 +488,9 @@ with tab2:
     keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, table_patterns)
     if keys_and_types:
         st.write("Retrieved keys and types:")#, keys_and_types)
-        generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns)
+        generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns, utc_ts)
         st.write("generate_event_table_query")
-        create_user_table_view(client, project_id, dataset_id, user_table_pattern)
+        create_user_table_view(client, project_id, dataset_id, user_table_pattern, utc_ts)
         st.write("create_user_table_view")
         create_event_table_view(client, project_id, dataset_id, table_patterns, keys_and_types)
         st.write("create_event_table_view")
@@ -501,7 +500,6 @@ with tab2:
         st.write('''
             ### Notes
             [Link to looker dashboard](https://lookerstudio.google.com/reporting/b774ca26-720c-4b23-999c-5e5cec53bca3/preview)
-            1. You will need to manually set up your timezones
             ''')
     else:
         st.write("Failed to retrieve keys and types.")
