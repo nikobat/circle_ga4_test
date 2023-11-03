@@ -121,7 +121,7 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
     union_subqueries = [
         f"""
         SELECT
-            DATETIME(TIMESTAMP_MICROS(event_timestamp), "{utc_ts}") AS event_timestamp,
+            FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(event_timestamp), "{utc_ts}")) AS event_timestamp,
             user_pseudo_id,
             event_name,
             platform AS event_platform,
@@ -222,8 +222,8 @@ def generate_user_table_query(project_id, dataset_id, user_table_pattern, utc_ts
     SELECT
         pseudo_user_id AS user_pseudo_id,
         stream_id AS user_stream_id,
-        DATETIME(TIMESTAMP_MICROS(user_info.last_active_timestamp_micros), "{utc_ts}") AS user_last_active_timestamp,
-        DATETIME(TIMESTAMP_MICROS(user_info.user_first_touch_timestamp_micros), "{utc_ts}") AS user_first_touch_timestamp,
+        FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.last_active_timestamp_micros), "{utc_ts}")) AS user_last_active_timestamp,
+        FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.user_first_touch_timestamp_micros), "{utc_ts}")) AS user_first_touch_timestamp,
         user_info.first_purchase_date AS user_first_purchase_date,
         device.operating_system AS user_device_operating_system,
         device.category AS user_device_category,
@@ -264,6 +264,7 @@ def get_distinct_counts(client, project_id, dataset_id, view_name):
         view_columns = [column.column_name for column in get_schema_columns(client, project_id, dataset_id, view_name)]
         if not view_columns:
             logging.error(f"No columns found in the view: {view_name}")
+            st.error(f"No columns found in a view")
             return {}
 
         # Create a query to get distinct counts for each column
@@ -285,6 +286,7 @@ def get_distinct_counts(client, project_id, dataset_id, view_name):
             return distinct_counts
     except Exception as e:
         logging.error(f"An error occurred while getting distinct counts for {view_name}: {e}")
+        st.error(f"An error occurred while getting distinct counts")
         return {}
 
 def identify_useless_columns(distinct_counts):
@@ -316,6 +318,7 @@ def create_updated_view(client, project_id, dataset_id, view_name, columns_to_ex
             logging.info(f"No columns to exclude in the view: {view_name}")
     except Exception as e:
         logging.error(f"An error occurred while creating the updated view for {view_name}: {e}")
+        st.error(f"An error occurred while creating or updating views")
 
 # Your create_summary_statistics function remains the same
 
@@ -352,10 +355,13 @@ def create_or_replace_view(client, project_id, dataset_id, view_name, query):
             logging.info(f"Created view {view_id} successfully.")
     except BadRequest as e:
         logging.error("Error: Bad request (e.g., schema or query issue). Details: %s", e)
+        st.error("Error: Bad request (e.g., schema or query issue). Check your logs")
     except GoogleAPICallError as e:
         logging.error("Error: API call failed. Details: %s", e)
+        st.error("Error: API call failed. Check your logs")
     except Exception as e:
         logging.error("An unexpected error occurred: %s", e)
+        st.error("Error: An unexpected error occurred. Check your logs")
 
 def create_user_table_view(client, project_id, dataset_id, user_table_pattern, utc_ts):
     user_table_query = generate_user_table_query(project_id, dataset_id, user_table_pattern, utc_ts)
