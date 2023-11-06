@@ -81,7 +81,7 @@ timezone_dict = {
 continents = ["North America", "South America", "Europe", "Asia", "Oceania"]
 
 # 
-def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
+def get_unique_keys_and_types(client, project_id, dataset_id, event_table_patterns):
     st.write("Getting unique keys and their types...")
     union_subqueries = [
         f"""
@@ -94,7 +94,7 @@ def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
         FROM `{project_id}.{dataset_id}.{table_pattern}`,
         UNNEST(event_params) AS ep
         """
-        for table_pattern in table_patterns
+        for table_pattern in event_table_patterns
     ]
     query = " UNION ALL ".join(union_subqueries) + " GROUP BY key, value_type"
     query_job = client.query(query)
@@ -103,7 +103,7 @@ def get_unique_keys_and_types(client, project_id, dataset_id, table_patterns):
     return {row.key: row.value_type for row in keys_and_types}
 
 # 
-def generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns, utc_ts):
+def generate_event_table_query(keys_and_types, project_id, dataset_id, event_table_patterns, utc_ts):
     logging.info("Generating the event table query...")
     
     pivot_sections = []
@@ -122,6 +122,7 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
         f"""
         SELECT
             FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(event_timestamp), "{utc_ts}")) AS event_timestamp,
+            user_id, 
             user_pseudo_id,
             event_name,
             platform AS event_platform,
@@ -159,7 +160,7 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
             `{project_id}.{dataset_id}.{table_pattern}`,
             UNNEST(event_params) AS ep
         """
-        for table_pattern in table_patterns
+        for table_pattern in event_table_patterns
     ]
 
     sql_query = f"""
@@ -169,6 +170,7 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
     pivot_table AS (
         SELECT 
             event_timestamp,
+            user_id,
             user_pseudo_id,
             event_name,
             event_platform,
@@ -202,7 +204,7 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
         FROM 
             expanded
        GROUP BY 
-    event_timestamp, user_pseudo_id, event_name, event_platform, event_stream_id, traffic_source, traffic_medium, traffic_name, event_geo_country, event_geo_region, event_geo_city, event_geo_sub_continent, event_geo_metro, event_geo_continent, event_device_browser, event_device_language, event_device_is_limited_ad_tracking, event_device_mobile_model_name, event_device_mobile_marketing_name, event_device_mobile_os_hardware_model, event_device_operating_system, event_device_operating_system_version, event_device_category, event_device_mobile_brand_name, event_user_first_touch_timestamp, event_user_ltv_revenue, event_user_ltv_currency, web_info_browser, web_info_browser_version, web_info_hostname
+    event_timestamp, user_id, user_pseudo_id, event_name, event_platform, event_stream_id, traffic_source, traffic_medium, traffic_name, event_geo_country, event_geo_region, event_geo_city, event_geo_sub_continent, event_geo_metro, event_geo_continent, event_device_browser, event_device_language, event_device_is_limited_ad_tracking, event_device_mobile_model_name, event_device_mobile_marketing_name, event_device_mobile_os_hardware_model, event_device_operating_system, event_device_operating_system_version, event_device_category, event_device_mobile_brand_name, event_user_first_touch_timestamp, event_user_ltv_revenue, event_user_ltv_currency, web_info_browser, web_info_browser_version, web_info_hostname
 )
     SELECT 
         * 
@@ -216,41 +218,90 @@ def generate_event_table_query(keys_and_types, project_id, dataset_id, table_pat
     logging.info("Event table query generated successfully...")
 
 def generate_user_table_query(project_id, dataset_id, user_table_pattern, utc_ts):
-    logging.info("Generating the user table query...")
-    
-    sql_query = f"""
-    SELECT
-        pseudo_user_id AS user_pseudo_id,
-        stream_id AS user_stream_id,
-        FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.last_active_timestamp_micros), "{utc_ts}")) AS user_last_active_timestamp,
-        FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.user_first_touch_timestamp_micros), "{utc_ts}")) AS user_first_touch_timestamp,
-        user_info.first_purchase_date AS user_first_purchase_date,
-        device.operating_system AS user_device_operating_system,
-        device.category AS user_device_category,
-        device.mobile_brand_name AS user_device_mobile_brand_name,
-        device.mobile_model_name AS user_device_mobile_model_name,
-        device.unified_screen_name AS user_device_unified_screen_name,
-        geo.city AS user_geo_city,
-        geo.country AS user_geo_country,
-        geo.continent AS user_geo_continent,
-        geo.region AS user_geo_region,
-        user_ltv.revenue_in_usd AS user_ltv_revenue_in_usd,
-        user_ltv.sessions AS user_ltv_sessions,
-        user_ltv.engagement_time_millis AS user_ltv_engagement_time,
-        user_ltv.purchases AS user_ltv_purchases,
-        user_ltv.engaged_sessions AS user_ltv_engaged_sessions,
-        user_ltv.session_duration_micros AS user_ltv_session_duration,
-        predictions.in_app_purchase_score_7d AS user_prediction_in_app_purchase_score_7d,
-        predictions.purchase_score_7d AS user_prediction_purchase_score_7d,
-        predictions.churn_score_7d AS user_prediction_churn_score_7d,
-        predictions.revenue_28d_in_usd AS user_prediction_revenue_28d,
-        occurrence_date AS user_occurrence_date,
-        last_updated_date AS user_last_updated_date,
-    FROM 
-        `{project_id}.{dataset_id}.{user_table_pattern}`
 
+    union_subqueries = []
+
+    for pattern in user_table_pattern:
+        if pattern == "pseudonymous_users_*":
+            subquery = f"""
+            SELECT
+                pseudo_user_id AS user_id,
+                FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.last_active_timestamp_micros), "{utc_ts}")) AS user_last_active_timestamp,
+                FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.user_first_touch_timestamp_micros), "{utc_ts}")) AS user_first_touch_timestamp,
+                user_info.first_purchase_date AS user_first_purchase_date,
+                device.operating_system AS user_device_operating_system,
+                device.category AS user_device_category,
+                device.mobile_brand_name AS user_device_mobile_brand_name,
+                device.mobile_model_name AS user_device_mobile_model_name,
+                device.unified_screen_name AS user_device_unified_screen_name,
+                geo.city AS user_geo_city,
+                geo.country AS user_geo_country,
+                geo.continent AS user_geo_continent,
+                geo.region AS user_geo_region,
+                user_ltv.revenue_in_usd AS user_ltv_revenue_in_usd,
+                user_ltv.sessions AS user_ltv_sessions,
+                user_ltv.engagement_time_millis AS user_ltv_engagement_time,
+                user_ltv.purchases AS user_ltv_purchases,
+                user_ltv.engaged_sessions AS user_ltv_engaged_sessions,
+                user_ltv.session_duration_micros AS user_ltv_session_duration,
+                predictions.in_app_purchase_score_7d AS user_prediction_in_app_purchase_score_7d,
+                predictions.purchase_score_7d AS user_prediction_purchase_score_7d,
+                predictions.churn_score_7d AS user_prediction_churn_score_7d,
+                predictions.revenue_28d_in_usd AS user_prediction_revenue_28d,
+                occurrence_date AS user_occurrence_date,
+                last_updated_date AS user_last_updated_date,
+            FROM 
+                `{project_id}.{dataset_id}.{pattern}`
+            """
+            union_subqueries.append(subquery)
+        elif pattern == "users_*":
+            subquery = f"""
+            SELECT
+                user_id AS user_id,
+                FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.last_active_timestamp_micros), "{utc_ts}")) AS user_last_active_timestamp,
+                FORMAT_DATETIME("%F %T {utc_ts}", DATETIME(TIMESTAMP_MICROS(user_info.user_first_touch_timestamp_micros), "{utc_ts}")) AS user_first_touch_timestamp,
+                user_info.first_purchase_date AS user_first_purchase_date,
+                device.operating_system AS user_device_operating_system,
+                device.category AS user_device_category,
+                device.mobile_brand_name AS user_device_mobile_brand_name,
+                device.mobile_model_name AS user_device_mobile_model_name,
+                device.unified_screen_name AS user_device_unified_screen_name,
+                geo.city AS user_geo_city,
+                geo.country AS user_geo_country,
+                geo.continent AS user_geo_continent,
+                geo.region AS user_geo_region,
+                user_ltv.revenue_in_usd AS user_ltv_revenue_in_usd,
+                user_ltv.sessions AS user_ltv_sessions,
+                user_ltv.engagement_time_millis AS user_ltv_engagement_time,
+                user_ltv.purchases AS user_ltv_purchases,
+                user_ltv.engaged_sessions AS user_ltv_engaged_sessions,
+                user_ltv.session_duration_micros AS user_ltv_session_duration,
+                predictions.in_app_purchase_score_7d AS user_prediction_in_app_purchase_score_7d,
+                predictions.purchase_score_7d AS user_prediction_purchase_score_7d,
+                predictions.churn_score_7d AS user_prediction_churn_score_7d,
+                predictions.revenue_28d_in_usd AS user_prediction_revenue_28d,
+                occurrence_date AS user_occurrence_date,
+                last_updated_date AS user_last_updated_date,
+            FROM 
+                `{project_id}.{dataset_id}.{pattern}`
+            """
+            union_subqueries.append(subquery)
+
+    # Join the individual subqueries with a "UNION ALL"
+    combined_subqueries = " UNION ALL ".join(union_subqueries)
+
+    sql_query = f"""
+    WITH expanded AS (
+        {combined_subqueries}
+    )
+    SELECT 
+        * 
+    FROM 
+        expanded
     """
     return sql_query
+
+    logging.info("User table query generated successfully...")
 
 # Function to retrieve schema columns
 def get_schema_columns(client, project_id, dataset_id, table_name):
@@ -367,13 +418,13 @@ def create_user_table_view(client, project_id, dataset_id, user_table_pattern, u
     user_table_query = generate_user_table_query(project_id, dataset_id, user_table_pattern, utc_ts)
     create_or_replace_view(client, project_id, dataset_id, "user_table_view", user_table_query)
 
-def create_event_table_view(client, project_id, dataset_id, table_patterns, keys_and_types):
-    event_table_query = generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns, utc_ts)
+def create_event_table_view(client, project_id, dataset_id, event_table_patterns, keys_and_types):
+    event_table_query = generate_event_table_query(keys_and_types, project_id, dataset_id, event_table_patterns, utc_ts)
     create_or_replace_view(client, project_id, dataset_id, "event_table_view", event_table_query)
 
 view_names = "user_table_view", "event_table_view"
-table_patterns = "events_*", "events_intraday_*"
-user_table_pattern = "pseudonymous_users_*"
+event_table_patterns = "events_*", "events_intraday_*"
+user_table_pattern = "users_*", "pseudonymous_users_*"
 
 ############################################################################################################################################################
 # Streamlit Layout
@@ -491,14 +542,14 @@ with tab2:
         st.stop()
 
     #This is where things are run
-    keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, table_patterns)
+    keys_and_types = get_unique_keys_and_types(client, project_id, dataset_id, event_table_patterns)
     if keys_and_types:
         st.write("Retrieved keys and types:")#, keys_and_types)
-        generate_event_table_query(keys_and_types, project_id, dataset_id, table_patterns, utc_ts)
+        generate_event_table_query(keys_and_types, project_id, dataset_id, event_table_patterns, utc_ts)
         st.write("generate_event_table_query")
         create_user_table_view(client, project_id, dataset_id, user_table_pattern, utc_ts)
         st.write("create_user_table_view")
-        create_event_table_view(client, project_id, dataset_id, table_patterns, keys_and_types)
+        create_event_table_view(client, project_id, dataset_id, event_table_patterns, keys_and_types)
         st.write("create_event_table_view")
         create_summary_statistics(client, project_id, dataset_id, view_names)
         st.write("create_summary_statistics")
